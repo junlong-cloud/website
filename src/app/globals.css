@@ -39,6 +39,11 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand-turquoise: var(--brand-turquoise);
+  --color-brand-turquoise-foreground: var(--brand-turquoise-foreground);
+  --color-brand-sunflower: var(--brand-sunflower);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -55,18 +60,24 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.645 0.204 16.4);
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.577 0.211 25);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.665 0.104 190);
+  /* PixTime brand palette: 3 main colors (coral=primary above, turquoise, sunflower) + red reserved as the one semantic danger/overtime exception (destructive, not a "main color"). */
+  --brand-turquoise: oklch(0.665 0.104 190);
+  --brand-turquoise-foreground: oklch(0.99 0 0);
+  --brand-sunflower: oklch(0.876 0.161 92);
+  --warning: oklch(0.876 0.161 92);
+  --warning-foreground: oklch(0.257 0.02 92);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -90,18 +101,23 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.645 0.204 16.4);
+  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: oklch(0.65 0.211 25);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.665 0.104 190);
+  --brand-turquoise: oklch(0.665 0.104 190);
+  --brand-turquoise-foreground: oklch(0.99 0 0);
+  --brand-sunflower: oklch(0.876 0.161 92);
+  --warning: oklch(0.876 0.161 92);
+  --warning-foreground: oklch(0.257 0.02 92);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -127,4 +143,43 @@
   html {
     @apply font-sans;
   }
+}
+
+/* PixTime: custom animations not covered by shadcn/Tailwind utilities */
+.btn-action {
+  transition: all 0.15s;
+}
+
+.btn-action:active {
+  transform: scale(0.95);
+}
+
+@keyframes pulse-alert {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(224, 52, 43, 0.4);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 30px 10px rgba(224, 52, 43, 0.2);
+  }
+}
+
+@keyframes blink-red {
+  0%,
+  100% {
+    border-color: #e0342b;
+    box-shadow: 0 0 8px rgba(224, 52, 43, 0.3);
+  }
+  50% {
+    border-color: #f3a29c;
+    box-shadow: 0 0 2px rgba(224, 52, 43, 0.1);
+  }
+}
+
+.overtime-card {
+  animation: blink-red 1.5s ease-in-out infinite !important;
+  border-width: 2px !important;
+  background: #fef2f2 !important;
 }

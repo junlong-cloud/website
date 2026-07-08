@@ -1,0 +1,48 @@
+import type { ShopConfig } from "@/types/timerpro-settings";
+
+export const mockShopConfig: ShopConfig = {
+  price_base: 19.9,
+  time_base: 60,
+  price_overtime: 20,
+  price_unlimited: 59.9,
+  price_single_board: 60,
+  buffer_min: 10,
+  calc_mode: "exact",
+  step_n: 30,
+  step_y: 15,
+  step_k: 1,
+  ceil_x: 5,
+  overtime_alert_enabled: false,
+  group_buys: [
+    {
+      id: "gb-1",
+      name: "两小时畅玩双人票",
+      type: "fixed",
+      price: 59.9,
+      people: 2,
+      duration_min: 120,
+      slot_start: "",
+      slot_end: "",
+    },
+    {
+      id: "gb-2",
+      name: "工作日午间时段票",
+      type: "time_slot",
+      price: 39.9,
+      people: 1,
+      duration_min: 0,
+      slot_start: "10:00",
+      slot_end: "18:00",
+    },
+    {
+      id: "gb-3",
+      name: "全天畅玩单人票",
+      type: "unlimited",
+      price: 59.9,
+      people: 1,
+      duration_min: 0,
+      slot_start: "",
+      slot_end: "",
+    },
+  ],
+};
