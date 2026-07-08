@@ -39,7 +39,7 @@ function HomeContent() {
     "history_records",
     mockHistoryRecords
   );
-  const [shopName, setShopName] = useCloudDocState("shop_meta", "TimerPro 演示店铺");
+  const [shopName, setShopName] = useCloudDocState("shop_meta", "PixTime 演示店铺");
   const [zones, setZones] = useCloudDocState<Zone[]>("zones", mockZones);
   const [seats, setSeats] = useCloudDocState<Seat[]>("seats", mockSeats);
   const [punchCardProducts, setPunchCardProducts] = useCloudDocState<PunchCardProduct[]>(

@@ -18,19 +18,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCloudDocState } from "@/hooks/useCloudDocState";
 import { mockShopConfig } from "@/lib/mock-timerpro-settings-data";
-import type { CustomerCode, GroupBuyConfig, ShopConfig } from "@/types/timerpro-settings";
+import type { GroupBuyConfig, ShopConfig } from "@/types/timerpro-settings";
 import type { ActiveOrder } from "@/types/timerpro-pos";
 import type { PunchCardMembership, PunchCardProduct, Seat, Zone } from "@/types/timerpro-seats";
-import { CustomerCodeModal } from "@/components/timerpro/modals/CustomerCodeModal";
 import { PunchCardModal } from "@/components/timerpro/modals/PunchCardModal";
-import {
-  downloadDataUrl,
-  downloadTextFile,
-  generateQrDataUrl,
-  generateQrSheetDataUrl,
-} from "@/lib/qr-export";
+import { downloadDataUrl, generateQrDataUrl } from "@/lib/qr-export";
 
 function createBlankGroupBuy(): GroupBuyConfig {
   return {
@@ -102,15 +95,6 @@ export function SettingsTab({
   activeOrders,
   shopUid,
 }: SettingsTabProps) {
-  const [customerUniversalUrl, setCustomerUniversalUrl] = useCloudDocState(
-    "customer_universal_url",
-    ""
-  );
-  const [customerCodes, setCustomerCodes] = useCloudDocState<CustomerCode[]>(
-    "customer_codes",
-    []
-  );
-  const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
   const [isPunchCardModalOpen, setIsPunchCardModalOpen] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
 
@@ -205,41 +189,6 @@ export function SettingsTab({
       [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
       return { ...prev, group_buys: list };
     });
-  };
-
-  const handleRefreshUniversalUrl = () => {
-    setCustomerUniversalUrl("https://timerpro.top/c/universal/SHOP123");
-  };
-
-  const resolvedUniversalUrl = () =>
-    customerUniversalUrl || "https://timerpro.top/c/universal/SHOP123";
-
-  const handleExportUniversalQr = async () => {
-    const dataUrl = await generateQrDataUrl(resolvedUniversalUrl());
-    downloadDataUrl(dataUrl, "通用入口二维码.png");
-  };
-
-  const handleExportUniversalNfc = () => {
-    downloadTextFile(
-      `# 通用入口\n${resolvedUniversalUrl()}`,
-      "通用入口NFC写入清单.txt"
-    );
-  };
-
-  const handleDownloadAllMaterials = async () => {
-    const dataUrl = await generateQrSheetDataUrl([
-      { label: "通用入口", url: resolvedUniversalUrl() },
-      ...customerCodes.map((c) => ({ label: c.label, url: c.url })),
-    ]);
-    downloadDataUrl(dataUrl, "全部物料包_二维码.png");
-    const lines = [
-      "# 通用入口",
-      resolvedUniversalUrl(),
-      "",
-      "# 号牌",
-      ...customerCodes.map((c) => `${c.label}: ${c.url}`),
-    ];
-    downloadTextFile(lines.join("\n"), "全部物料包_NFC清单.txt");
   };
 
   const handleReset = () => {
@@ -737,44 +686,6 @@ export function SettingsTab({
             )}
           </div>
 
-          <div className="mt-8 mb-3 flex items-center justify-between border-b border-border pb-2">
-            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
-              <QrCode className="size-4 text-primary" />
-              顾客号牌码
-            </h3>
-            <Button variant="outline" size="xs" onClick={handleRefreshUniversalUrl}>
-              刷新
-            </Button>
-          </div>
-          <div className="bg-muted/30 border border-border rounded-lg p-3">
-            <div className="mb-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-              <div className="font-bold text-primary mb-1">本店通用顾客入口</div>
-              <div className="text-primary/90 break-all">
-                {customerUniversalUrl || "点击刷新后生成本店入口链接"}
-              </div>
-              <p className="mt-1 text-primary/70">
-                这个链接做成店内通用二维码，顾客扫码后只需要输入自己的号牌/标识。
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="default" size="sm" onClick={() => setIsCodeModalOpen(true)}>
-                管理号牌码
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportUniversalQr}>
-                导出通用入口二维码
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportUniversalNfc}>
-                导出通用入口NFC
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownloadAllMaterials}>
-                下载全部物料包
-              </Button>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              号牌生成、二维码导出和 NFC 写入清单在弹窗内统一处理，避免设置页过长。
-            </p>
-          </div>
-
           <div className="mt-4 flex justify-end gap-3 pt-4 border-t border-border">
             {savedMessage && (
               <span className="self-center text-sm text-brand-turquoise">{savedMessage}</span>
@@ -786,15 +697,6 @@ export function SettingsTab({
           </div>
         </div>
       </div>
-
-      {isCodeModalOpen && (
-        <CustomerCodeModal
-          customerUniversalUrl={customerUniversalUrl}
-          customerCodes={customerCodes}
-          onCustomerCodesChange={setCustomerCodes}
-          onClose={() => setIsCodeModalOpen(false)}
-        />
-      )}
 
       {isPunchCardModalOpen && (
         <PunchCardModal

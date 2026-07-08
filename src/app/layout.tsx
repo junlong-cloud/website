@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TimerPro 云端收银台",
-  description: "TimerPro cloud POS & timed billing system",
+  title: "PixTime 云端收银台",
+  description: "PixTime cloud POS & timed billing system",
 };
 
 export default function RootLayout({
