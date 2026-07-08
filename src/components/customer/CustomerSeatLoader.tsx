@@ -10,6 +10,6 @@ const CustomerSeatView = dynamic(
   { ssr: false }
 );
 
-export function CustomerSeatLoader({ shopUid, seatId }: { shopUid: string; seatId: string }) {
-  return <CustomerSeatView shopUid={shopUid} seatId={seatId} />;
+export function CustomerSeatLoader() {
+  return <CustomerSeatView />;
 }

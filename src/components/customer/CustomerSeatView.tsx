@@ -9,17 +9,29 @@ import type { PublicSeatStatus } from "@/types/timerpro-seats";
 type LoadState =
   | { phase: "loading" }
   | { phase: "error"; message: string }
-  | { phase: "free" }
+  | { phase: "free"; seatId: string }
   | { phase: "occupied"; status: PublicSeatStatus };
 
-/** Public, read-only "how long has my seat been running" view — no login, no cost shown. */
-export function CustomerSeatView({ shopUid, seatId }: { shopUid: string; seatId: string }) {
+/**
+ * Public, read-only "how long has my seat been running" view — no login, no
+ * cost shown. Reads shopUid/seatId from the URL's query string (?u=&s=) rather
+ * than a Next.js dynamic route segment, so this page is a single static file
+ * (works under `output: "export"` static hosting) that serves any seat.
+ */
+export function CustomerSeatView() {
   const [state, setState] = useState<LoadState>({ phase: "loading" });
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const query = new URLSearchParams(window.location.search);
+      const shopUid = query.get("u");
+      const seatId = query.get("s");
+      if (!shopUid || !seatId) {
+        setState({ phase: "error", message: "链接无效，请重新扫码" });
+        return;
+      }
       try {
         if (!auth.currentUser) {
           const { error } = await auth.signInAnonymously();
@@ -29,7 +41,7 @@ export function CustomerSeatView({ shopUid, seatId }: { shopUid: string; seatId:
         if (cancelled) return;
         const doc = res.data?.[0] as { value?: PublicSeatStatus[] } | undefined;
         const found = doc?.value?.find((s) => s.seatId === seatId);
-        setState(found ? { phase: "occupied", status: found } : { phase: "free" });
+        setState(found ? { phase: "occupied", status: found } : { phase: "free", seatId });
       } catch (err) {
         if (cancelled) return;
         setState({ phase: "error", message: err instanceof Error ? err.message : "加载失败" });
@@ -38,7 +50,7 @@ export function CustomerSeatView({ shopUid, seatId }: { shopUid: string; seatId:
     return () => {
       cancelled = true;
     };
-  }, [shopUid, seatId]);
+  }, []);
 
   useEffect(() => {
     if (state.phase !== "occupied") return;
@@ -59,7 +71,7 @@ export function CustomerSeatView({ shopUid, seatId }: { shopUid: string; seatId:
 
         {state.phase === "free" && (
           <>
-            <h1 className="text-lg font-semibold text-foreground mb-1">座位 {seatId}</h1>
+            <h1 className="text-lg font-semibold text-foreground mb-1">座位 {state.seatId}</h1>
             <p className="text-sm text-muted-foreground">当前空闲，暂无进行中的计时</p>
           </>
         )}

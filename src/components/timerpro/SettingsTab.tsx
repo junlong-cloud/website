@@ -142,7 +142,7 @@ export function SettingsTab({
 
   const handleDownloadSeatQr = async (seat: Seat) => {
     if (!shopUid) return;
-    const url = `${window.location.origin}/c/${shopUid}/${seat.id}`;
+    const url = `${window.location.origin}/c/?u=${encodeURIComponent(shopUid)}&s=${encodeURIComponent(seat.id)}`;
     const dataUrl = await generateQrDataUrl(url);
     downloadDataUrl(dataUrl, `座位二维码_${seat.label || seat.id}.png`);
   };
