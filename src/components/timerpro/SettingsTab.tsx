@@ -78,6 +78,8 @@ export interface SettingsTabProps {
     updater: (prev: PunchCardMembership[]) => PunchCardMembership[]
   ) => void;
   activeOrders: ActiveOrder[];
+  /** Signed-in shop owner's uid, used to build each seat's customer-facing QR URL (/c/[shopUid]/[seatId]). */
+  shopUid: string | undefined;
 }
 
 function createBlankPunchCardProduct(): PunchCardProduct {
@@ -98,6 +100,7 @@ export function SettingsTab({
   punchCardMemberships,
   onPunchCardMembershipsChange,
   activeOrders,
+  shopUid,
 }: SettingsTabProps) {
   const [customerUniversalUrl, setCustomerUniversalUrl] = useCloudDocState(
     "customer_universal_url",
@@ -135,6 +138,13 @@ export function SettingsTab({
 
   const handleRemoveSeat = (id: string) => {
     onSeatsChange((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const handleDownloadSeatQr = async (seat: Seat) => {
+    if (!shopUid) return;
+    const url = `${window.location.origin}/c/${shopUid}/${seat.id}`;
+    const dataUrl = await generateQrDataUrl(url);
+    downloadDataUrl(dataUrl, `座位二维码_${seat.label || seat.id}.png`);
   };
 
   const handleAddPunchCardProduct = () => {
@@ -627,6 +637,17 @@ export function SettingsTab({
                               placeholder="座位号"
                               className="flex-1 min-w-0 border border-input rounded-lg px-2 py-1 text-sm"
                             />
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="ghost"
+                              disabled={!shopUid}
+                              title="下载本座位专属二维码"
+                              onClick={() => handleDownloadSeatQr(seat)}
+                              className="text-muted-foreground hover:text-primary shrink-0"
+                            >
+                              <QrCode className="size-3" />
+                            </Button>
                             <Button
                               type="button"
                               size="icon-xs"

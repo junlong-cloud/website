@@ -1,4 +1,5 @@
 import type { ActiveOrder, ShopConfig } from "@/types/timerpro-pos";
+import type { PublicSeatStatus } from "@/types/timerpro-seats";
 
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -45,4 +46,38 @@ export function tickOrder(order: ActiveOrder, now: number, shopConfig: ShopConfi
   }
 
   return next;
+}
+
+export function toPublicSeatStatus(order: ActiveOrder): PublicSeatStatus {
+  return {
+    seatId: order.seatId,
+    seatLabel: order.seatLabel,
+    modeText: order.modeText,
+    startTimestamp: order.startTimestamp,
+    isPaused: order.isPaused,
+    pauseStartedAt: order.pauseStartedAt ?? null,
+    pausedAccumMs: order.pausedAccumMs ?? 0,
+    isSuspended: order.isSuspended,
+    countdownTotalMinutes: order.countdown?.totalMinutes ?? null,
+  };
+}
+
+/** Elapsed time + countdown percent for the customer-facing seat view — no cost involved, so unlike tickOrder this needs no ShopConfig. */
+export function tickPublicSeatStatus(
+  status: PublicSeatStatus,
+  now: number
+): { elapsedTime: string; countdownPercent: number | null } {
+  if (status.isSuspended) return { elapsedTime: formatDuration(0), countdownPercent: null };
+
+  const pausedMs =
+    status.pausedAccumMs + (status.isPaused && status.pauseStartedAt ? now - status.pauseStartedAt : 0);
+  const elapsedMs = Math.max(0, now - status.startTimestamp - pausedMs);
+  const elapsedMinutes = elapsedMs / 60000;
+
+  const countdownPercent =
+    status.countdownTotalMinutes != null
+      ? Math.round((elapsedMinutes / status.countdownTotalMinutes) * 100)
+      : null;
+
+  return { elapsedTime: formatDuration(elapsedMs), countdownPercent };
 }

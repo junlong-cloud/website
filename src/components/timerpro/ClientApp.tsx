@@ -7,6 +7,7 @@ import { HistoryTab } from "@/components/timerpro/HistoryTab";
 import { DashboardTab } from "@/components/timerpro/DashboardTab";
 import { SettingsTab } from "@/components/timerpro/SettingsTab";
 import { LoginGate } from "@/components/auth/LoginGate";
+import { useAuth } from "@/hooks/useAuth";
 import { useCloudDocState } from "@/hooks/useCloudDocState";
 import { mockHistoryRecords } from "@/lib/mock-timerpro-history-data";
 import {
@@ -18,14 +19,21 @@ import {
 } from "@/lib/mock-timerpro-pos-data";
 import { buildHistoryRecordFromCompletedOrder } from "@/lib/timerpro-history-convert";
 import { toPosShopConfig } from "@/lib/timerpro-shop-config-adapter";
-import { tickOrder } from "@/lib/order-tick";
+import { tickOrder, toPublicSeatStatus } from "@/lib/order-tick";
 import { mockShopConfig as mockSettingsShopConfig } from "@/lib/mock-timerpro-settings-data";
 import type { HistoryRecord } from "@/types/timerpro-history";
 import type { ActiveOrder } from "@/types/timerpro-pos";
 import type { ShopConfig as SettingsShopConfig } from "@/types/timerpro-settings";
-import type { PunchCardMembership, PunchCardProduct, Seat, Zone } from "@/types/timerpro-seats";
+import type {
+  PublicSeatStatus,
+  PunchCardMembership,
+  PunchCardProduct,
+  Seat,
+  Zone,
+} from "@/types/timerpro-seats";
 
 function HomeContent() {
+  const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState<TabKey>("pos");
   const [historyRecords, setHistoryRecords] = useCloudDocState<HistoryRecord[]>(
     "history_records",
@@ -52,6 +60,18 @@ function HomeContent() {
     mockSettingsShopConfig
   );
   const posShopConfig = toPosShopConfig(settingsShopConfig);
+
+  // Sanitized (no cost/pricing) mirror of activeOrders, published under READONLY
+  // permissions so the public /c/[uid]/[seatId] customer page can read it via an
+  // anonymous session. Only re-published when activeOrders itself changes (real
+  // actions), not on the per-second tick.
+  const [, setPublicSeatStatus] = useCloudDocState<PublicSeatStatus[]>("public_seat_status", []);
+  useEffect(() => {
+    setPublicSeatStatus(
+      activeOrders.filter((o) => !o.isSuspended).map((o) => toPublicSeatStatus(o))
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrders]);
 
   // Client-side-only render snapshot: recomputes elapsed time/cost/countdown every
   // second without touching `activeOrders` (and therefore without writing to the
@@ -118,6 +138,7 @@ function HomeContent() {
             punchCardMemberships={punchCardMemberships}
             onPunchCardMembershipsChange={setPunchCardMemberships}
             activeOrders={activeOrders}
+            shopUid={user?.uid}
           />
         </div>
       </main>

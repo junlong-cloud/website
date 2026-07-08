@@ -29,3 +29,23 @@ export interface PunchCardMembership {
   remainingUses: number;
   purchasedAt: number;
 }
+
+/**
+ * Sanitized, customer-safe mirror of an occupied seat's ActiveOrder — published
+ * to a separately-permissioned cloud collection so the public /c/[uid]/[seatId]
+ * page can read it via an anonymous session. Deliberately excludes cost/pricing
+ * fields (estimatedCost, lockedCost, gbConfig, rawRemark) and anything else that
+ * shouldn't be visible to a customer scanning a QR code.
+ */
+export interface PublicSeatStatus {
+  seatId: string;
+  seatLabel: string;
+  modeText: string;
+  startTimestamp: number;
+  isPaused: boolean;
+  pauseStartedAt: number | null;
+  pausedAccumMs: number;
+  isSuspended: boolean;
+  /** Present only for modes with a fixed duration (fixed/group_buy time-limited/etc). */
+  countdownTotalMinutes: number | null;
+}
