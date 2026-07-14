@@ -10,6 +10,7 @@ type Project = {
   accent: string;
   mark: string;
   imageCount: number;
+  displayCopies: number;
 };
 
 const projects: Project[] = [
@@ -22,6 +23,7 @@ const projects: Project[] = [
     accent: "#c9f43d",
     mark: "P",
     imageCount: 10,
+    displayCopies: 1,
   },
   {
     name: "ETF DASHBOARD",
@@ -32,6 +34,7 @@ const projects: Project[] = [
     accent: "#ffc85a",
     mark: "E",
     imageCount: 4,
+    displayCopies: 2,
   },
   {
     name: "PRODUCT RADAR",
@@ -42,13 +45,15 @@ const projects: Project[] = [
     accent: "#9ed9ff",
     mark: "R",
     imageCount: 13,
+    displayCopies: 1,
   },
 ];
 
 // 无限横向滚动（marquee）：两组重复内容首尾相接循环位移，
 // reverse 时反向（从左往右）。hover 暂停。机制同 MagicUI Marquee。
 function PhoneStrip({ project, reverse }: { project: Project; reverse?: boolean }) {
-  const sequence = Array.from({ length: project.imageCount }, (_, index) => index + 1);
+  const baseSequence = Array.from({ length: project.imageCount }, (_, index) => index + 1);
+  const sequence = Array.from({ length: project.displayCopies }, () => baseSequence).flat();
 
   const renderGroup = (groupKey: string, hidden: boolean) => (
     <div
@@ -61,7 +66,7 @@ function PhoneStrip({ project, reverse }: { project: Project; reverse?: boolean 
           <Image
             className="aw-phoneImage"
             src={`/assets/app-${project.slug}-${image}.png`}
-            alt={hidden ? "" : `${project.name} mobile screen ${index + 1}`}
+            alt={hidden || index >= project.imageCount ? "" : `${project.name} mobile screen ${image}`}
             width={1320}
             height={2868}
             style={{ width: "100%", height: "auto" }}
