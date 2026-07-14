@@ -14,10 +14,15 @@ interface OtpSession {
 
 /** `auth.currentUser` (a synchronous getter) is the reliable source of truth for
  * who's signed in — verifyOtp/getSession's own resolved payloads don't reliably
- * expose `uid` the way their type signatures suggest. */
+ * expose `uid` the way their type signatures suggest.
+ *
+ * Requires `phone_number` so an anonymous session (created by the customer-facing
+ * /c page's signInAnonymously) is NOT mistaken for a signed-in shop owner — that
+ * would let a polluted browser read/write under an anonymous uid, a separate data
+ * bucket from the phone-number account. */
 function currentCloudUser(): CloudUser | null {
   const u = auth.currentUser as { uid?: string; phone_number?: string } | null;
-  return u?.uid ? { uid: u.uid, phone: u.phone_number } : null;
+  return u?.uid && u.phone_number ? { uid: u.uid, phone: u.phone_number } : null;
 }
 
 /**

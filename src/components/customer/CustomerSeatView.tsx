@@ -37,7 +37,10 @@ export function CustomerSeatView() {
           const { error } = await auth.signInAnonymously();
           if (error) throw new Error(error.message);
         }
-        const res = await db.collection("public_seat_status").where({ uid: shopUid }).get();
+        // Read the shop's single deterministic doc (id === shopUid) directly, not
+        // via where(): a where() query returns data[0] in unspecified order, so if
+        // legacy duplicate docs exist it could pick an empty one and show 空闲.
+        const res = await db.collection("public_seat_status").doc(shopUid).get();
         if (cancelled) return;
         const doc = res.data?.[0] as { value?: PublicSeatStatus[] } | undefined;
         const found = doc?.value?.find((s) => s.seatId === seatId);
