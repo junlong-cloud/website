@@ -10,15 +10,18 @@ export interface SeatCardProps {
   order?: ActiveOrder;
   membership?: PunchCardMembership;
   onClick: () => void;
+  disabled?: boolean;
 }
 
-export function SeatCard({ seat, order, membership, onClick }: SeatCardProps) {
+export function SeatCard({ seat, order, membership, onClick, disabled = false }: SeatCardProps) {
   if (!order) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className="text-left border border-dashed border-border rounded-xl p-4 hover:border-primary/40 hover:bg-primary/5 transition-colors"
+        disabled={disabled}
+        aria-busy={disabled || undefined}
+        className="text-left border border-dashed border-border rounded-xl p-4 hover:border-primary/40 hover:bg-primary/5 transition-colors disabled:cursor-wait disabled:opacity-60"
       >
         <div className="font-bold text-foreground">{seat.label}</div>
         <div className="mt-3 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
@@ -68,7 +71,9 @@ export function SeatCard({ seat, order, membership, onClick }: SeatCardProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`text-left border rounded-xl p-4 hover:shadow-md transition-all duration-200 ${cardClasses}`}
+      disabled={disabled}
+      aria-busy={disabled || undefined}
+      className={`text-left border rounded-xl p-4 hover:shadow-md transition-all duration-200 disabled:cursor-wait disabled:opacity-60 ${cardClasses}`}
     >
       <div className="font-bold text-foreground">{seat.label}</div>
       <div className={`mt-3 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${badgeClasses}`}>

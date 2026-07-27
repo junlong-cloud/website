@@ -11,6 +11,12 @@ export interface Seat {
   label: string;
 }
 
+export interface SeatLayoutBackup {
+  savedAt: number;
+  zones: Zone[];
+  seats: Seat[];
+}
+
 export interface PunchCardProduct {
   id: string;
   name: string;

@@ -12,6 +12,7 @@ export interface SeatMapPanelProps {
   punchCardMemberships: PunchCardMembership[];
   onSeatClick: (seat: Seat) => void;
   filter?: SeatStatusBucket | "all";
+  disabled?: boolean;
 }
 
 export function SeatMapPanel({
@@ -21,6 +22,7 @@ export function SeatMapPanel({
   punchCardMemberships,
   onSeatClick,
   filter = "all",
+  disabled = false,
 }: SeatMapPanelProps) {
   const ordersBySeatId = new Map(activeOrders.map((o) => [o.seatId, o]));
   const membershipsById = new Map(punchCardMemberships.map((m) => [m.id, m]));
@@ -69,6 +71,7 @@ export function SeatMapPanel({
                       order={order}
                       membership={membership}
                       onClick={() => onSeatClick(seat)}
+                      disabled={disabled}
                     />
                   );
                 })}

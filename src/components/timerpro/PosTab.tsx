@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { SeatMapPanel } from "@/components/timerpro/SeatMapPanel";
 import { SeatStatusFilterBar } from "@/components/timerpro/SeatStatusFilterBar";
+import { Button } from "@/components/ui/button";
 import { getSeatStatus, getSeatStatusBucket, type SeatStatusBucket } from "@/lib/seat-status";
 import { RemarkModal } from "@/components/timerpro/modals/RemarkModal";
 import { CheckoutModal } from "@/components/timerpro/modals/CheckoutModal";
@@ -16,8 +18,21 @@ import {
   type OvertimeAlertItem,
 } from "@/components/timerpro/modals/OvertimeAlertModal";
 import type { CompletedOrderPayload } from "@/lib/timerpro-history-convert";
-import type { ActiveOrder, OrderMode, ShopConfig } from "@/types/timerpro-pos";
-import type { PunchCardMembership, PunchCardProduct, Seat, Zone } from "@/types/timerpro-seats";
+import type {
+  ActiveOrder,
+  ActiveOrderDraft,
+  ActiveOrderMutation,
+  ActiveOrderMutationResult,
+  OrderMode,
+  ShopConfig,
+} from "@/types/timerpro-pos";
+import type {
+  PunchCardMembership,
+  PunchCardProduct,
+  Seat,
+  SeatLayoutBackup,
+  Zone,
+} from "@/types/timerpro-seats";
 import { formatDuration } from "@/lib/order-tick";
 
 const MODE_TEXT: Record<OrderMode, string> = {
@@ -38,11 +53,10 @@ type ModalState =
   | { type: "add_time"; orderId: number }
   | { type: "overtime_alert"; items: OvertimeAlertItem[] };
 
-function baseOrderFields(id: number, seat: Seat): ActiveOrder {
+function baseOrderFields(seat: Seat): ActiveOrderDraft {
   const now = new Date();
   const startTime = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   return {
-    id,
     seatId: seat.id,
     seatLabel: seat.label,
     mode: "pay_later",
@@ -64,13 +78,46 @@ function baseOrderFields(id: number, seat: Seat): ActiveOrder {
   };
 }
 
+function toMutation(previous: ActiveOrder[], next: ActiveOrder[]): ActiveOrderMutation | null {
+  const previousIds = new Set(previous.map((order) => order.id));
+  const nextIds = new Set(next.map((order) => order.id));
+  const added = next.filter((order) => !previousIds.has(order.id));
+  const removed = previous.filter((order) => !nextIds.has(order.id));
+
+  if (added.length === 1 && removed.length === 0) {
+    const order = Object.fromEntries(
+      Object.entries(added[0]).filter(([key]) => key !== "id")
+    ) as ActiveOrderDraft;
+    return { type: "open", order };
+  }
+  if (removed.length === 1 && added.length === 0) return { type: "remove", id: removed[0].id };
+  if (added.length > 0 || removed.length > 0) return null;
+
+  const changed = next.find((order) => {
+    const previousOrder = previous.find((candidate) => candidate.id === order.id);
+    return previousOrder && JSON.stringify(previousOrder) !== JSON.stringify(order);
+  });
+  if (!changed) return null;
+
+  const previousOrder = previous.find((order) => order.id === changed.id);
+  if (!previousOrder) return null;
+  const patch = Object.fromEntries(
+    Object.entries(changed).filter(
+      ([key, value]) =>
+        !["id", "seatId", "seatLabel", "startTime", "startTimestamp"].includes(key) &&
+        JSON.stringify(previousOrder[key as keyof ActiveOrder]) !== JSON.stringify(value)
+    )
+  );
+  return { type: "patch", id: changed.id, patch };
+}
+
 export interface PosTabProps {
   shopConfig: ShopConfig;
   /** Cloud-persisted source state — only mutated by explicit user actions (open/pause/checkout/...), never by the per-second clock. */
   activeOrders: ActiveOrder[];
   /** Same orders with live elapsed time/cost/countdown recomputed client-side every second; use this for anything rendered. */
   displayOrders: ActiveOrder[];
-  onActiveOrdersChange: (updater: (prev: ActiveOrder[]) => ActiveOrder[]) => void;
+  onActiveOrdersMutate: (mutation: ActiveOrderMutation) => Promise<ActiveOrderMutationResult>;
   ordersHydrated: boolean;
   zones: Zone[];
   seats: Seat[];
@@ -80,13 +127,15 @@ export interface PosTabProps {
     updater: (prev: PunchCardMembership[]) => PunchCardMembership[]
   ) => void;
   onCheckoutComplete?: (payload: CompletedOrderPayload) => void;
+  seatLayoutBackup: SeatLayoutBackup | null;
+  onRestoreSeatLayout: () => void;
 }
 
 export function PosTab({
   shopConfig,
   activeOrders,
   displayOrders,
-  onActiveOrdersChange: setActiveOrders,
+  onActiveOrdersMutate,
   ordersHydrated,
   zones,
   seats,
@@ -94,9 +143,13 @@ export function PosTab({
   punchCardMemberships,
   onPunchCardMembershipsChange,
   onCheckoutComplete,
+  seatLayoutBackup,
+  onRestoreSeatLayout,
 }: PosTabProps) {
   const [modal, setModal] = useState<ModalState>({ type: "none" });
   const [seatFilter, setSeatFilter] = useState<SeatStatusBucket | "all">("all");
+  const [isMutating, setIsMutating] = useState(false);
+  const [mutationError, setMutationError] = useState("");
   const overtimeCheckedRef = useRef(false);
 
   const seatStatusCounts = useMemo(() => {
@@ -131,9 +184,47 @@ export function PosTab({
 
   const closeModal = () => setModal({ type: "none" });
 
+  const mutateOrders = async (mutation: ActiveOrderMutation) => {
+    setIsMutating(true);
+    setMutationError("");
+    try {
+      const result = await onActiveOrdersMutate(mutation);
+      if (result.conflict) {
+        setMutationError(result.message ?? "该座位已在另一台设备开台");
+        return false;
+      }
+      return true;
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : "订单同步失败，请重试");
+      return false;
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const setActiveOrders = (updater: (previous: ActiveOrder[]) => ActiveOrder[]) => {
+    const mutation = toMutation(activeOrders, updater(activeOrders));
+    if (mutation) void mutateOrders(mutation);
+  };
+
+  const handleRestoreSeatLayout = () => {
+    if (!seatLayoutBackup) return;
+    const backedUpSeatIds = new Set(seatLayoutBackup.seats.map((seat) => seat.id));
+    const missingActiveOrder = activeOrders.find((order) => !backedUpSeatIds.has(order.seatId));
+    if (missingActiveOrder) {
+      setMutationError(`无法恢复：${missingActiveOrder.seatLabel} 正在使用，且不在备份布局中`);
+      return;
+    }
+    if (window.confirm("恢复会覆盖当前区域和座位布局，确定继续吗？")) {
+      setMutationError("");
+      onRestoreSeatLayout();
+    }
+  };
+
   const handleOpenTable = (seat: Seat, payload: OpenTablePayload) => {
-    const id = Math.max(0, ...activeOrders.map((o) => o.id)) + 1;
-    const order = baseOrderFields(id, seat);
+    if (isMutating) return;
+    const order = baseOrderFields(seat);
+    let updatePunchCardMemberships: (() => void) | undefined;
 
     if (payload.kind === "builtin") {
       order.mode = payload.mode;
@@ -177,11 +268,12 @@ export function PosTab({
         order.estimatedCost = 0;
         order.punchCardMembershipId = membership.id;
         order.punchCardProductNameSnapshot = membership.productNameSnapshot;
-        onPunchCardMembershipsChange((prevM) =>
-          prevM.map((m) =>
-            m.id === membership.id ? { ...m, remainingUses: Math.max(0, m.remainingUses - 1) } : m
-          )
-        );
+        updatePunchCardMemberships = () =>
+          onPunchCardMembershipsChange((prevM) =>
+            prevM.map((m) =>
+              m.id === membership.id ? { ...m, remainingUses: Math.max(0, m.remainingUses - 1) } : m
+            )
+          );
       }
     } else if (payload.kind === "punch_card_new") {
       const product = punchCardProducts.find((p) => p.id === payload.productId);
@@ -192,24 +284,28 @@ export function PosTab({
         order.estimatedCost = 0;
         order.punchCardMembershipId = membershipId;
         order.punchCardProductNameSnapshot = product.name;
-        onPunchCardMembershipsChange((prevM) => [
-          {
-            id: membershipId,
-            customerName: payload.customerName,
-            phone: payload.phone,
-            productId: product.id,
-            productNameSnapshot: product.name,
-            totalUsesSnapshot: product.total_uses,
-            remainingUses: Math.max(0, product.total_uses - 1),
-            purchasedAt: Date.now(),
-          },
-          ...prevM,
-        ]);
+        updatePunchCardMemberships = () =>
+          onPunchCardMembershipsChange((prevM) => [
+            {
+              id: membershipId,
+              customerName: payload.customerName,
+              phone: payload.phone,
+              productId: product.id,
+              productNameSnapshot: product.name,
+              totalUsesSnapshot: product.total_uses,
+              remainingUses: Math.max(0, product.total_uses - 1),
+              purchasedAt: Date.now(),
+            },
+            ...prevM,
+          ]);
       }
     }
 
-    setActiveOrders((prev) => [order, ...prev]);
-    closeModal();
+    void mutateOrders({ type: "open", order }).then((opened) => {
+      if (!opened) return;
+      updatePunchCardMemberships?.();
+      closeModal();
+    });
   };
 
   const handleRemove = (id: number) => {
@@ -329,20 +425,25 @@ export function PosTab({
   };
 
   const handleConfirmCheckout = (id: number, amount: number, remark: string) => {
+    if (isMutating) return;
     // displayOrders (not activeOrders) so `estimatedCost` reflects the live-ticked amount, not the last-persisted one.
     const order = displayOrders.find((o) => o.id === id);
-    if (order && onCheckoutComplete) {
-      const now = Date.now();
-      const pausedMs =
-        (order.pausedAccumMs ?? 0) +
-        (order.isPaused && order.pauseStartedAt ? now - order.pauseStartedAt : 0);
-      const totalMs = Math.max(0, now - order.startTimestamp);
-      const playMs = Math.max(0, totalMs - pausedMs);
-      const mainGbVerified =
-        order.gbConfig != null &&
-        order.added_gb.find((g) => g.id === order.gbConfig!.id)?.verified === true;
+    if (!order) return;
 
-      onCheckoutComplete({
+    void mutateOrders({ type: "remove", id }).then((removed) => {
+      if (!removed) return;
+      if (onCheckoutComplete) {
+        const now = Date.now();
+        const pausedMs =
+          (order.pausedAccumMs ?? 0) +
+          (order.isPaused && order.pauseStartedAt ? now - order.pauseStartedAt : 0);
+        const totalMs = Math.max(0, now - order.startTimestamp);
+        const playMs = Math.max(0, totalMs - pausedMs);
+        const mainGbVerified =
+          order.gbConfig != null &&
+          order.added_gb.find((g) => g.id === order.gbConfig!.id)?.verified === true;
+
+        onCheckoutComplete({
         seatLabel: order.seatLabel,
         modeText: order.modeText,
         startTime: order.startTime,
@@ -362,10 +463,10 @@ export function PosTab({
         actualTotal: amount,
         remark,
         guestCount: 1,
-      });
-    }
-    setActiveOrders((prev) => prev.filter((o) => o.id !== id));
-    closeModal();
+        });
+      }
+      closeModal();
+    });
   };
 
   const remarkOrder =
@@ -377,6 +478,25 @@ export function PosTab({
 
   return (
     <div>
+      {(!ordersHydrated || isMutating || mutationError) && (
+        <p className={`mb-3 text-sm ${mutationError ? "text-destructive" : "text-muted-foreground"}`} role="status">
+          {mutationError || (isMutating ? "正在同步订单…" : "正在加载订单…")}
+        </p>
+      )}
+      {seatLayoutBackup && (
+        <div className="mb-3 flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRestoreSeatLayout}
+            disabled={!ordersHydrated || isMutating}
+          >
+            <RotateCcw className="size-3.5" />
+            恢复布局备份（{new Date(seatLayoutBackup.savedAt).toLocaleString("zh-CN")}）
+          </Button>
+        </div>
+      )}
       <SeatStatusFilterBar
         counts={seatStatusCounts}
         filter={seatFilter}
@@ -388,6 +508,7 @@ export function PosTab({
         activeOrders={displayOrders}
         punchCardMemberships={punchCardMemberships}
         filter={seatFilter}
+        disabled={!ordersHydrated || isMutating}
         onSeatClick={(seat) => {
           const order = activeOrders.find((o) => o.seatId === seat.id);
           if (order) {
@@ -406,6 +527,8 @@ export function PosTab({
           punchCardMemberships={punchCardMemberships}
           onCancel={closeModal}
           onConfirm={(payload) => handleOpenTable(modal.seat, payload)}
+          isSubmitting={isMutating}
+          errorMessage={mutationError}
         />
       )}
 

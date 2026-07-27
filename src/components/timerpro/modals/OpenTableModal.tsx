@@ -26,6 +26,8 @@ export interface OpenTableModalProps {
   punchCardMemberships: PunchCardMembership[];
   onCancel: () => void;
   onConfirm: (payload: OpenTablePayload) => void;
+  isSubmitting?: boolean;
+  errorMessage?: string;
 }
 
 type TabKey = "group_buy" | "builtin" | "punch_card";
@@ -77,6 +79,8 @@ export function OpenTableModal({
   punchCardMemberships,
   onCancel,
   onConfirm,
+  isSubmitting = false,
+  errorMessage,
 }: OpenTableModalProps) {
   const [tab, setTab] = useState<TabKey>("builtin");
 
@@ -346,7 +350,8 @@ export function OpenTableModal({
           <Button type="button" variant="outline" onClick={onCancel}>
             取消
           </Button>
-          <Button type="button" disabled={!canConfirm} onClick={handleConfirm}>
+          {errorMessage && <p className="mr-auto self-center text-sm text-destructive">{errorMessage}</p>}
+          <Button type="button" disabled={!canConfirm || isSubmitting} onClick={handleConfirm}>
             确认开台
           </Button>
         </DialogFooter>

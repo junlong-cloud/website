@@ -11,6 +11,7 @@ import {
   MapPin,
   Plus,
   QrCode,
+  Save,
   Settings as SettingsIcon,
   Store,
   Ticket,
@@ -64,6 +65,8 @@ export interface SettingsTabProps {
   onZonesChange: (updater: (prev: Zone[]) => Zone[]) => void;
   seats: Seat[];
   onSeatsChange: (updater: (prev: Seat[]) => Seat[]) => void;
+  onSaveSeatLayout: () => void;
+  layoutReady: boolean;
   punchCardProducts: PunchCardProduct[];
   onPunchCardProductsChange: (updater: (prev: PunchCardProduct[]) => PunchCardProduct[]) => void;
   punchCardMemberships: PunchCardMembership[];
@@ -88,6 +91,8 @@ export function SettingsTab({
   onZonesChange,
   seats,
   onSeatsChange,
+  onSaveSeatLayout,
+  layoutReady,
   punchCardProducts,
   onPunchCardProductsChange,
   punchCardMemberships,
@@ -122,6 +127,12 @@ export function SettingsTab({
 
   const handleRemoveSeat = (id: string) => {
     onSeatsChange((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const handleSaveSeatLayout = () => {
+    onSaveSeatLayout();
+    setSavedMessage("座位布局已保存备份");
+    setTimeout(() => setSavedMessage(""), 2000);
   };
 
   const handleDownloadSeatQr = async (seat: Seat) => {
@@ -536,10 +547,16 @@ export function SettingsTab({
               <MapPin className="size-4 text-primary" />
               区域座位管理
             </h3>
-            <Button variant="outline" size="xs" onClick={handleAddZone}>
-              <Plus className="size-3" />
-              添加区域
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="xs" onClick={handleSaveSeatLayout} disabled={!layoutReady}>
+                <Save className="size-3" />
+                保存布局
+              </Button>
+              <Button variant="outline" size="xs" onClick={handleAddZone}>
+                <Plus className="size-3" />
+                添加区域
+              </Button>
+            </div>
           </div>
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-primary/80 space-y-1">
             <p>仅空闲座位可删除：占用中请先在座位图结单。</p>

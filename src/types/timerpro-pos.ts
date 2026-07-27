@@ -75,3 +75,21 @@ export interface ActiveOrder {
   /** Snapshot of the punch-card product name, used as modeText/history display. */
   punchCardProductNameSnapshot?: string;
 }
+
+export type ActiveOrderDraft = Omit<ActiveOrder, "id">;
+
+export type ActiveOrderPatch = Partial<
+  Omit<ActiveOrder, "id" | "seatId" | "seatLabel" | "startTime" | "startTimestamp">
+>;
+
+export type ActiveOrderMutation =
+  | { type: "bootstrap"; orders: ActiveOrder[] }
+  | { type: "open"; order: ActiveOrderDraft }
+  | { type: "patch"; id: number; patch: ActiveOrderPatch }
+  | { type: "remove"; id: number };
+
+export interface ActiveOrderMutationResult {
+  orders: ActiveOrder[];
+  conflict?: boolean;
+  message?: string;
+}

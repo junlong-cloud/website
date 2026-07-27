@@ -8,6 +8,7 @@ import { DashboardTab } from "@/components/timerpro/DashboardTab";
 import { SettingsTab } from "@/components/timerpro/SettingsTab";
 import { LoginGate } from "@/components/auth/LoginGate";
 import { useAuth } from "@/hooks/useAuth";
+import { useActiveOrders } from "@/hooks/useActiveOrders";
 import { useCloudDocState } from "@/hooks/useCloudDocState";
 import { mockHistoryRecords } from "@/lib/mock-timerpro-history-data";
 import {
@@ -19,16 +20,15 @@ import {
 } from "@/lib/mock-timerpro-pos-data";
 import { buildHistoryRecordFromCompletedOrder } from "@/lib/timerpro-history-convert";
 import { toPosShopConfig } from "@/lib/timerpro-shop-config-adapter";
-import { tickOrder, toPublicSeatStatus } from "@/lib/order-tick";
+import { tickOrder } from "@/lib/order-tick";
 import { mockShopConfig as mockSettingsShopConfig } from "@/lib/mock-timerpro-settings-data";
 import type { HistoryRecord } from "@/types/timerpro-history";
-import type { ActiveOrder } from "@/types/timerpro-pos";
 import type { ShopConfig as SettingsShopConfig } from "@/types/timerpro-settings";
 import type {
-  PublicSeatStatus,
   PunchCardMembership,
   PunchCardProduct,
   Seat,
+  SeatLayoutBackup,
   Zone,
 } from "@/types/timerpro-seats";
 
@@ -40,8 +40,12 @@ function HomeContent() {
     mockHistoryRecords
   );
   const [shopName, setShopName] = useCloudDocState("shop_meta", "PixTime 演示店铺");
-  const [zones, setZones] = useCloudDocState<Zone[]>("zones", mockZones);
-  const [seats, setSeats] = useCloudDocState<Seat[]>("seats", mockSeats);
+  const [zones, setZones, zonesHydrated] = useCloudDocState<Zone[]>("zones", mockZones);
+  const [seats, setSeats, seatsHydrated] = useCloudDocState<Seat[]>("seats", mockSeats);
+  const [seatLayoutBackup, setSeatLayoutBackup, backupHydrated] = useCloudDocState<SeatLayoutBackup | null>(
+    "seats_backup",
+    null
+  );
   const [punchCardProducts, setPunchCardProducts] = useCloudDocState<PunchCardProduct[]>(
     "punch_card_products",
     mockPunchCardProducts
@@ -51,27 +55,12 @@ function HomeContent() {
   >("punch_card_memberships", mockPunchCardMemberships);
   // Only ever written by explicit user actions (open/pause/checkout/...) — never by the
   // per-second clock, so this doesn't turn into a per-second write to the database.
-  const [activeOrders, setActiveOrders, activeOrdersHydrated] = useCloudDocState<ActiveOrder[]>(
-    "active_orders",
-    mockActiveOrders
-  );
+  const [activeOrders, mutateActiveOrders, activeOrdersHydrated] = useActiveOrders(mockActiveOrders);
   const [settingsShopConfig, setSettingsShopConfig] = useCloudDocState<SettingsShopConfig>(
     "shop_config",
     mockSettingsShopConfig
   );
   const posShopConfig = toPosShopConfig(settingsShopConfig);
-
-  // Sanitized (no cost/pricing) mirror of activeOrders, published under READONLY
-  // permissions so the public /c/[uid]/[seatId] customer page can read it via an
-  // anonymous session. Only re-published when activeOrders itself changes (real
-  // actions), not on the per-second tick.
-  const [, setPublicSeatStatus] = useCloudDocState<PublicSeatStatus[]>("public_seat_status", []);
-  useEffect(() => {
-    setPublicSeatStatus(
-      activeOrders.filter((o) => !o.isSuspended).map((o) => toPublicSeatStatus(o))
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeOrders]);
 
   // Client-side-only render snapshot: recomputes elapsed time/cost/countdown every
   // second without touching `activeOrders` (and therefore without writing to the
@@ -96,13 +85,19 @@ function HomeContent() {
             shopConfig={posShopConfig}
             activeOrders={activeOrders}
             displayOrders={displayOrders}
-            onActiveOrdersChange={setActiveOrders}
+            onActiveOrdersMutate={mutateActiveOrders}
             ordersHydrated={activeOrdersHydrated}
             zones={zones}
             seats={seats}
             punchCardProducts={punchCardProducts}
             punchCardMemberships={punchCardMemberships}
             onPunchCardMembershipsChange={setPunchCardMemberships}
+            seatLayoutBackup={seatLayoutBackup}
+            onRestoreSeatLayout={() => {
+              if (!seatLayoutBackup) return;
+              setZones(() => seatLayoutBackup.zones);
+              setSeats(() => seatLayoutBackup.seats);
+            }}
             onCheckoutComplete={(payload) => {
               const record = buildHistoryRecordFromCompletedOrder(
                 payload,
@@ -133,6 +128,8 @@ function HomeContent() {
             onZonesChange={setZones}
             seats={seats}
             onSeatsChange={setSeats}
+            onSaveSeatLayout={() => setSeatLayoutBackup({ savedAt: Date.now(), zones, seats })}
+            layoutReady={zonesHydrated && seatsHydrated && backupHydrated}
             punchCardProducts={punchCardProducts}
             onPunchCardProductsChange={setPunchCardProducts}
             punchCardMemberships={punchCardMemberships}
