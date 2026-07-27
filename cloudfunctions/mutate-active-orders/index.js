@@ -44,5 +44,5 @@ exports.main = async (event) => {
 
     return { ...result, orders: nextOrders };
   });
-  return transactionResult.result;
+  return transactionResult;
 };
